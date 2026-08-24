@@ -89,11 +89,11 @@
   /* ---------- Timer ---------- */
   .timer-btn{background:transparent;border:0;cursor:pointer;padding:0;line-height:0;position:relative;border-radius:50%;}
   .timer-btn:focus-visible{outline:3px solid var(--amber);outline-offset:4px;}
-  .ring{display:block;width:clamp(108px,16vh,146px);height:clamp(108px,16vh,146px);transform:rotate(-90deg);}
+  .ring{display:block;width:clamp(132px,20vh,182px);height:clamp(132px,20vh,182px);transform:rotate(-90deg);}
   .ring .track{fill:none;stroke:var(--ring-track);stroke-width:9;}
   .ring .prog{fill:none;stroke:var(--teal);stroke-width:9;stroke-linecap:round;transition:stroke .25s linear;}
   .readout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
-  .secs{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:clamp(34px,6vh,48px);line-height:.9;font-variant-numeric:tabular-nums;}
+  .secs{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:clamp(40px,7.2vh,58px);line-height:.9;font-variant-numeric:tabular-nums;}
   .state{font-size:clamp(9px,1.4vh,12px);letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-top:6px;}
   .hint{position:absolute;left:50%;top:calc(100% + 6px);transform:translateX(-50%);font-size:11px;color:var(--muted);white-space:nowrap;transition:opacity .3s ease;}
 
@@ -151,6 +151,17 @@
   .lb-meta{font-size:11px;color:var(--muted);}
   .lb-score{margin-left:auto;font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:22px;color:var(--teal);flex:none;}
   .lb-empty{width:100%;text-align:center;color:var(--muted);padding:30px 10px;font-size:14px;}
+
+  /* ---------- Tussenscherm (klok nog niet gestart) ---------- */
+  .ready{width:100%;flex:0 0 auto;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:clamp(22px,5vh,44px) 16px;color:var(--muted);}
+  .ready .em{font-size:clamp(34px,7vh,46px);line-height:1;}
+  .ready .big{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:clamp(18px,2.6vh,22px);color:var(--paper);}
+  .ready .sub{font-size:13px;max-width:30ch;}
+  #screen-game.pre .card,
+  #screen-game.pre .tip,
+  #screen-game.pre .next,
+  #screen-game.pre .hint{display:none;}
+  #screen-game.pre .ready{display:flex;}
 
   /* ---------- Toestanden ---------- */
   @media (prefers-reduced-motion: no-preference){
@@ -236,10 +247,16 @@
     <span class="hint" id="hint">tik om te starten</span>
   </button>
 
+  <div class="ready" id="ready">
+    <div class="em">⏳</div>
+    <div class="big">Tik op de klok om te starten</div>
+    <div class="sub">De woorden verschijnen zodra de tijd loopt</div>
+  </div>
+
   <div class="card" id="card"></div>
   <p class="tip" id="tip">Tik een woord aan als het geraden is</p>
 
-  <button class="next" id="next">Volgende beurt &rsaquo;</button>
+  <button class="next" id="next">Volgende beurt</button>
 
   <div class="scoreboard" id="scoreboard"></div>
 </section>
@@ -394,9 +411,12 @@ function renderCard(){
   guessed.clear();
   const words=DECK[drawIndex()];
   cardEl.innerHTML=words.map((w,i)=>
-    `<button class="row" data-i="${i}" aria-pressed="false"><span class="num">${i+1}</span><span class="word">${w}</span><span class="check">✓</span></button>`
+    `<button class="row" data-i="${i}" aria-pressed="false"><span class="num">${i+1}</span><span class="word">${cap(w)}</span><span class="check">✓</span></button>`
   ).join("");
+  setPlaying(false);
 }
+function cap(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+function setPlaying(on){ if(typeof gameScreen!=="undefined" && gameScreen) gameScreen.classList.toggle("pre", !on); }
 cardEl.addEventListener("click", e=>{
   const row=e.target.closest(".row"); if(!row) return;
   const i=+row.dataset.i;
@@ -480,7 +500,7 @@ function updateGameUI(){
     ? `Aan zet: <b>${escapeHtml(t.name)}</b> &middot; ronde ${round}/${cfg.rounds}`
     : `Ronde ${round}/${cfg.rounds}`;
   const last = (turnsTotal+1) >= cfg.numTeams*cfg.rounds;
-  document.getElementById("next").innerHTML = last ? "Toon uitslag &rsaquo;" : "Volgende beurt &rsaquo;";
+  document.getElementById("next").textContent = last ? "Toon uitslag" : "Volgende beurt";
   updateScoreboard();
 }
 
@@ -605,10 +625,10 @@ function loop(ts){
   if(remaining<=0){ remaining=0; paint(); finish(); return; }
   paint(); raf=requestAnimationFrame(loop);
 }
-function start(){ if(remaining<=0) reset(true); running=true; last=0; stateEl.textContent="bezig"; gameScreen.classList.remove("done"); hint.style.opacity=0; raf=requestAnimationFrame(loop); }
+function start(){ if(remaining<=0) reset(true); running=true; last=0; stateEl.textContent="bezig"; gameScreen.classList.remove("done"); hint.style.opacity=0; setPlaying(true); raf=requestAnimationFrame(loop); }
 function pause(){ running=false; cancelAnimationFrame(raf); stateEl.textContent="pauze"; gameScreen.classList.remove("urgent"); }
 function toggle(){ ensureAudio(); running?pause():start(); }
-function reset(silent){ running=false; cancelAnimationFrame(raf); remaining=DURATION; shownSec=30; gameScreen.classList.remove("urgent","done"); stateEl.textContent="klaar"; paint(); if(!silent) hint.style.opacity=1; }
+function reset(silent){ running=false; cancelAnimationFrame(raf); remaining=DURATION; shownSec=30; gameScreen.classList.remove("urgent","done"); stateEl.textContent="klaar"; paint(); setPlaying(false); if(!silent) hint.style.opacity=1; }
 function finish(){ running=false; stateEl.textContent="tijd om!"; gameScreen.classList.add("done"); gameScreen.classList.remove("urgent"); setTimeout(()=>gameScreen.classList.remove("done"),500); buzzer(); }
 
 /* ========================================================= */
