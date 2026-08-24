@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>30 Seconden</title>
+<meta name="description" content="Het woordraadspel met ingebouwde timer en lokaal leaderbord.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0E1220">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E1220; --paper:#FBF5E9; --paper-line:#E7DEC9; --card-ink:#1B2236;
+    --vermilion:#FF5A3C; --amber:#F5A623; --teal:#25C7AB; --muted:#8A93AD;
+    --ring-track:rgba(255,255,255,.10);
+    --panel:rgba(255,255,255,.04); --panel-line:rgba(255,255,255,.09);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;}
+  body{
+    font-family:"Inter",system-ui,-apple-system,sans-serif;
+    background:radial-gradient(120% 80% at 50% 0%, #1D2540 0%, var(--ink) 55%), var(--ink);
+    color:var(--paper);
+  }
+  h1,h2,h3{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;margin:0;}
+  button{font-family:inherit;}
+
+  /* ---------- Schermsysteem ---------- */
+  .screen{
+    display:none; height:100dvh; height:100vh; width:100%;
+    max-width:600px; margin:0 auto; flex-direction:column; align-items:center;
+    padding:max(12px,env(safe-area-inset-top)) 16px max(14px,env(safe-area-inset-bottom));
+  }
+  .screen.active{display:flex;}
+  #screen-start,#screen-over,#screen-board{overflow-y:auto;gap:16px;justify-content:flex-start;}
+  #screen-game{overflow:hidden;gap:clamp(7px,1.7vh,16px);}
+  .grow{flex:1 1 auto;} .spacer{flex:1;min-height:8px;}
+
+  /* ---------- Merk ---------- */
+  .brand{display:flex;align-items:center;gap:9px;font-family:"Bricolage Grotesque",sans-serif;font-weight:800;letter-spacing:.02em;}
+  .brand .glass{width:22px;height:22px;border-radius:7px;background:var(--vermilion);display:grid;place-items:center;color:#fff;font-size:13px;flex:none;}
+
+  /* ---------- Startscherm ---------- */
+  .hero{text-align:center;margin-top:6vh;}
+  .hero .logo{width:74px;height:74px;border-radius:20px;background:var(--vermilion);display:grid;place-items:center;font-size:40px;margin:0 auto 14px;box-shadow:0 16px 34px -16px var(--vermilion);}
+  .hero h1{font-size:clamp(34px,7vw,46px);letter-spacing:-.01em;}
+  .hero p{color:var(--muted);margin:8px 0 0;font-size:14px;max-width:34ch;margin-inline:auto;}
+
+  .panel{width:100%;background:var(--panel);border:1px solid var(--panel-line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:16px;}
+  .field{display:flex;flex-direction:column;gap:8px;}
+  .field > label{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+
+  .seg{display:flex;gap:8px;background:rgba(0,0,0,.2);padding:4px;border-radius:12px;}
+  .seg button{flex:1;border:0;cursor:pointer;background:transparent;color:var(--muted);font-weight:800;padding:11px 8px;border-radius:9px;font-size:14px;transition:.15s;}
+  .seg button.selected{background:var(--vermilion);color:#fff;}
+  .seg button:focus-visible{outline:3px solid var(--amber);outline-offset:2px;}
+
+  .name-input{width:100%;background:rgba(0,0,0,.22);border:1px solid var(--panel-line);border-radius:12px;padding:13px 14px;color:var(--paper);font-size:16px;font-weight:700;font-family:inherit;}
+  .name-input::placeholder{color:#5f6880;font-weight:500;}
+  .name-input:focus{outline:none;border-color:var(--amber);}
+  .name-row{display:flex;align-items:center;gap:10px;}
+  .name-row .chip{width:12px;height:12px;border-radius:50%;flex:none;}
+  #team2wrap{display:none;}
+
+  .btn-primary{border:0;cursor:pointer;color:#fff;background:var(--vermilion);font-family:"Bricolage Grotesque",sans-serif;font-weight:800;border-radius:14px;padding:15px 26px;font-size:18px;width:100%;transition:transform .08s ease,filter .15s ease;box-shadow:0 14px 26px -14px var(--vermilion);}
+  .btn-primary:hover{filter:brightness(1.06);} .btn-primary:active{transform:scale(.97);}
+  .btn-primary:focus-visible{outline:3px solid var(--amber);outline-offset:3px;}
+  .btn-ghost{border:1px solid var(--panel-line);cursor:pointer;background:var(--panel);color:var(--paper);font-weight:700;border-radius:12px;padding:12px 18px;font-size:15px;transition:.15s;display:inline-flex;align-items:center;gap:8px;justify-content:center;}
+  .btn-ghost:hover{background:rgba(255,255,255,.09);}
+  .btn-ghost:active{transform:scale(.97);}
+  .btn-ghost:focus-visible{outline:3px solid var(--amber);outline-offset:2px;}
+
+  /* ---------- Bovenbalk spel ---------- */
+  .topbar{width:100%;display:flex;align-items:center;justify-content:space-between;}
+  .top-ctrl{display:flex;gap:8px;}
+  .icon-btn{width:40px;height:40px;border-radius:12px;cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--paper);display:grid;place-items:center;font-size:17px;transition:background .15s ease,transform .08s ease;}
+  .icon-btn:hover{background:rgba(255,255,255,.10);} .icon-btn:active{transform:scale(.92);}
+  .icon-btn:focus-visible{outline:3px solid var(--amber);outline-offset:2px;}
+
+  .status{width:100%;text-align:center;font-size:clamp(13px,1.9vh,15px);color:var(--muted);}
+  .status b{color:var(--paper);}
+
+  /* ---------- Timer ---------- */
+  .timer-btn{background:transparent;border:0;cursor:pointer;padding:0;line-height:0;position:relative;border-radius:50%;}
+  .timer-btn:focus-visible{outline:3px solid var(--amber);outline-offset:4px;}
+  .ring{display:block;width:clamp(108px,16vh,146px);height:clamp(108px,16vh,146px);transform:rotate(-90deg);}
+  .ring .track{fill:none;stroke:var(--ring-track);stroke-width:9;}
+  .ring .prog{fill:none;stroke:var(--teal);stroke-width:9;stroke-linecap:round;transition:stroke .25s linear;}
+  .readout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+  .secs{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:clamp(34px,6vh,48px);line-height:.9;font-variant-numeric:tabular-nums;}
+  .state{font-size:clamp(9px,1.4vh,12px);letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-top:6px;}
+  .hint{position:absolute;left:50%;top:calc(100% + 6px);transform:translateX(-50%);font-size:11px;color:var(--muted);white-space:nowrap;transition:opacity .3s ease;}
+
+  /* ---------- Kaartje ---------- */
+  .card{width:100%;background:var(--paper);color:var(--card-ink);border-radius:20px;padding:clamp(4px,1vh,10px) clamp(12px,4vw,22px);box-shadow:0 20px 44px -24px rgba(0,0,0,.8);}
+  .row{width:100%;display:flex;align-items:center;gap:clamp(11px,3.2vw,18px);padding:clamp(6px,1.25vh,13px) clamp(2px,1.5vw,8px);background:transparent;border:0;cursor:pointer;text-align:left;font:inherit;color:inherit;border-radius:12px;transition:background .12s ease;}
+  .row + .row{border-top:1px solid var(--paper-line);}
+  .row:hover{background:rgba(27,34,54,.04);}
+  .row:focus-visible{outline:3px solid var(--amber);outline-offset:-2px;}
+  .num{flex:none;width:clamp(28px,4.4vh,36px);height:clamp(28px,4.4vh,36px);display:grid;place-items:center;border-radius:10px;background:var(--card-ink);color:var(--paper);font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:clamp(14px,2.1vh,18px);transition:opacity .15s ease;}
+  .word{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;letter-spacing:-.01em;font-size:clamp(18px,3vh,27px);line-height:1.1;transition:color .15s ease;}
+  .check{margin-left:auto;flex:none;width:clamp(24px,3.7vh,28px);height:clamp(24px,3.7vh,28px);border-radius:50%;border:2px solid var(--paper-line);display:grid;place-items:center;color:transparent;font-size:14px;font-weight:800;transition:.15s ease;}
+  .row.done{background:rgba(37,199,171,.12);}
+  .row.done .num{opacity:.4;}
+  .row.done .word{color:#9aa2ad;text-decoration:line-through;text-decoration-thickness:2px;}
+  .row.done .check{background:var(--teal);border-color:var(--teal);color:#fff;}
+  .tip{color:var(--muted);font-size:12px;margin:0;text-align:center;transition:opacity .3s ease;}
+
+  .next{border:0;cursor:pointer;color:#fff;background:var(--vermilion);font-family:"Bricolage Grotesque",sans-serif;font-weight:800;border-radius:14px;padding:clamp(11px,1.6vh,15px) 26px;font-size:clamp(15px,2.2vh,18px);transition:transform .08s ease,filter .15s ease;box-shadow:0 12px 24px -14px var(--vermilion);}
+  .next:hover{filter:brightness(1.06);} .next:active{transform:scale(.96);}
+  .next:focus-visible{outline:3px solid var(--amber);outline-offset:3px;}
+
+  /* ---------- Scorebord (in spel) ---------- */
+  .scoreboard{width:100%;display:flex;gap:12px;}
+  .team{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:9px 8px;border-radius:14px;background:var(--panel);border:1px solid var(--panel-line);transition:.15s ease;}
+  .team-name{display:flex;align-items:center;gap:7px;font-weight:700;font-size:clamp(11px,1.6vh,14px);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .team-name .dot{width:10px;height:10px;border-radius:50%;flex:none;}
+  .team-score{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:clamp(23px,3.4vh,31px);line-height:1.05;}
+  .team-sub{font-size:11px;height:14px;line-height:14px;color:var(--amber);font-weight:700;}
+  .team.active{box-shadow:inset 0 0 0 2px var(--acc);background:color-mix(in srgb, var(--acc) 12%, transparent);}
+  .team.active .team-score{color:var(--acc);}
+
+  /* ---------- Uitslag ---------- */
+  .result{text-align:center;margin-top:2vh;}
+  .result .kicker{color:var(--muted);letter-spacing:.14em;text-transform:uppercase;font-size:12px;font-weight:700;}
+  .result h2{font-size:clamp(26px,6vw,34px);margin-top:6px;}
+  .finals{width:100%;display:flex;flex-direction:column;gap:10px;}
+  .final{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;background:var(--panel);border:1px solid var(--panel-line);}
+  .final .dot{width:14px;height:14px;border-radius:50%;flex:none;}
+  .final .fname{font-weight:800;font-size:16px;}
+  .final .fscore{margin-left:auto;font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:26px;}
+  .final.win{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset;}
+  .final .crown{font-size:18px;}
+  .newflag{font-size:11px;font-weight:800;color:var(--ink);background:var(--amber);border-radius:999px;padding:3px 8px;letter-spacing:.03em;}
+
+  /* ---------- Leaderbord ---------- */
+  .board-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .board-head h2{font-size:22px;display:flex;align-items:center;gap:9px;}
+  .lb{width:100%;display:flex;flex-direction:column;gap:8px;}
+  .lb-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:13px;background:var(--panel);border:1px solid var(--panel-line);}
+  .lb-row.fresh{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset;}
+  .lb-rank{width:26px;text-align:center;font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:17px;color:var(--muted);flex:none;}
+  .lb-main{display:flex;flex-direction:column;min-width:0;}
+  .lb-name{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .lb-meta{font-size:11px;color:var(--muted);}
+  .lb-score{margin-left:auto;font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:22px;color:var(--teal);flex:none;}
+  .lb-empty{width:100%;text-align:center;color:var(--muted);padding:30px 10px;font-size:14px;}
+
+  /* ---------- Toestanden ---------- */
+  @media (prefers-reduced-motion: no-preference){
+    #screen-game.urgent .secs{animation:beat .9s ease-in-out infinite;}
+    @keyframes beat{0%,100%{transform:scale(1);}50%{transform:scale(1.12);}}
+  }
+  #screen-game.done{animation:flash .5s ease;}
+  @keyframes flash{0%{background-color:transparent;}30%{background-color:rgba(255,90,60,.18);}100%{background-color:transparent;}}
+  #screen-game.done .secs{color:var(--vermilion);}
+</style>
+</head>
+<body>
+
+<!-- ============ STARTSCHERM ============ -->
+<section class="screen active" id="screen-start">
+  <div class="hero">
+    <div class="logo">⏳</div>
+    <h1>30 Seconden</h1>
+    <p>Raad zoveel mogelijk woorden voor de zandloper leegloopt.</p>
+  </div>
+
+  <div class="panel">
+    <div class="field">
+      <label>Spelvorm</label>
+      <div class="seg" id="modeSeg" role="group" aria-label="Aantal teams">
+        <button data-mode="1" class="selected">1 team &middot; samenspel</button>
+        <button data-mode="2">2 teams</button>
+      </div>
+    </div>
+
+    <div class="field" id="team1wrap">
+      <label id="team1label">Teamnaam</label>
+      <div class="name-row">
+        <span class="chip" style="background:var(--vermilion)"></span>
+        <input class="name-input" id="team1" maxlength="18" placeholder="bv. De Woordkanonnen">
+      </div>
+    </div>
+
+    <div class="field" id="team2wrap">
+      <label>Team 2</label>
+      <div class="name-row">
+        <span class="chip" style="background:var(--teal)"></span>
+        <input class="name-input" id="team2" maxlength="18" placeholder="bv. De Snelraders">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Beurten per team</label>
+      <div class="seg" id="roundSeg" role="group" aria-label="Aantal beurten per team">
+        <button data-rounds="3">3</button>
+        <button data-rounds="5" class="selected">5</button>
+        <button data-rounds="8">8</button>
+        <button data-rounds="10">10</button>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="startBtn">Start spel</button>
+  </div>
+
+  <button class="btn-ghost" id="toBoard">🏆 Bekijk leaderbord</button>
+  <div class="spacer"></div>
+</section>
+
+<!-- ============ SPELSCHERM ============ -->
+<section class="screen" id="screen-game">
+  <div class="topbar">
+    <button class="icon-btn" id="homeBtn" title="Terug naar start" aria-label="Terug naar startscherm">✕</button>
+    <div class="brand"><span class="glass">⏳</span>30 Seconden</div>
+    <div class="top-ctrl">
+      <button class="icon-btn" id="reset" title="Timer opnieuw" aria-label="Timer opnieuw instellen">↺</button>
+      <button class="icon-btn" id="mute" title="Geluid aan/uit" aria-label="Geluid aan of uit">♪</button>
+    </div>
+  </div>
+
+  <div class="status" id="status">Ronde 1/5</div>
+
+  <button class="timer-btn" id="timerBtn" aria-label="Timer starten of pauzeren">
+    <svg class="ring" viewBox="0 0 120 120">
+      <circle class="track" cx="60" cy="60" r="52"></circle>
+      <circle class="prog"  cx="60" cy="60" r="52" id="prog"></circle>
+    </svg>
+    <span class="readout"><span class="secs" id="secs">30</span><span class="state" id="state">klaar</span></span>
+    <span class="hint" id="hint">tik om te starten</span>
+  </button>
+
+  <div class="card" id="card"></div>
+  <p class="tip" id="tip">Tik een woord aan als het geraden is</p>
+
+  <button class="next" id="next">Volgende beurt &rsaquo;</button>
+
+  <div class="scoreboard" id="scoreboard"></div>
+</section>
+
+<!-- ============ UITSLAGSCHERM ============ -->
+<section class="screen" id="screen-over">
+  <div class="result">
+    <div class="kicker">Spel afgelopen</div>
+    <h2 id="resultTitle">Uitslag</h2>
+  </div>
+  <div class="finals" id="finals"></div>
+  <button class="btn-primary" id="playAgain">Opnieuw spelen</button>
+  <button class="btn-ghost" id="overToBoard">🏆 Volledig leaderbord</button>
+  <button class="btn-ghost" id="overToStart">Instellingen wijzigen</button>
+  <div class="spacer"></div>
+</section>
+
+<!-- ============ LEADERBORDSCHERM ============ -->
+<section class="screen" id="screen-board">
+  <div class="board-head">
+    <h2>🏆 Leaderbord</h2>
+    <button class="icon-btn" id="boardBack" title="Terug" aria-label="Terug">←</button>
+  </div>
+  <div class="lb" id="lb"></div>
+  <div class="spacer"></div>
+  <button class="btn-ghost" id="clearBoard">Leaderbord wissen</button>
+</section>
+
+<script>
+/* =========================================================
+   30 SECONDEN — kaartjes
+   Elk kaartje = 5 begrippen. Voeg gerust regels toe
+   in hetzelfde formaat: ["woord1","woord2","woord3","woord4","woord5"],
+   ========================================================= */
+const DECK = [
+  ["Kevin De Bruyne","Atomium","pannenkoek","niezen","kangoeroe"],
+  ["Tom Boonen","de Ardennen","frietje","verjaardagstaart","telescoop"],
+  ["Kim Clijsters","Bokrijk","praline","sneeuwman","mondharmonica"],
+  ["Eddy Merckx","Manneken Pis","trappist","regenboog","stofzuiger"],
+  ["Stromae","Gent","stoofvlees","bliksem","ladder"],
+  ["Wout van Aert","de Noordzee","speculoos","kompas","egel"],
+  ["Jacques Brel","Brugge","waterzooi","vuurtoren","accordeon"],
+  ["Nafi Thiam","Durbuy","cava","sterrenkijker","wasbeer"],
+  ["Sandra Kim","de Kempen","mattentaart","paraplu","boemerang"],
+  ["Rode Duivels","de bioscoop","croque monsieur","aardbeving","kruiwagen"],
+  ["Marc Coucke","Pairi Daiza","jenever","noorderlicht","naaimachine"],
+  ["Jean-Claude Van Damme","Oostende","garnaalkroket","tornado","hangmat"],
+  ["Sven Nys","de Leie","kriek","zonsverduistering","metaaldetector"],
+  ["Bart Peeters","Antwerpen-Centraal","filet américain","dauw","saxofoon"],
+  ["Natalia","de Hoge Venen","geuze","vallende ster","waterpomp"],
+  ["Salvador Dalí","Dinant","luikse wafel","ijzel","windmolen"],
+  ["Helmut Lotti","het Zoniënwoud","cuberdon","hagel","trampoline"],
+  ["Sergio Herman","Knokke","oesters","poolster","deegroller"],
+  ["Regi","Tomorrowland","energiedrank","vuurwerk","discobal"],
+  ["Urbanus","Aalst","ballekes","carnaval","ezel"],
+  ["Jonas Vingegaard","de Mont Ventoux","bidon","hittegolf","versnellingspook"],
+  ["Pommelien Thijs","Leuven","studentenkot","examens","hoelahoep"],
+  ["Koen Wauters","Mechelen","maantjes","kerktoren","jojo"],
+  ["Bart De Wever","het stadhuis","verkiezingen","megafoon","schaakspel"],
+  ["Laura Tesoro","de Grote Markt","chocomousse","confetti","tamboerijn"],
+  ["Wim Lybaert","de moestuin","courgette","oogst","gieter"],
+  ["Albert Einstein","Wenen","wiener schnitzel","zwaartekracht","viool"],
+  ["Serena Williams","Wimbledon","aardbei met slagroom","donderslag","tennisracket"],
+  ["Lionel Messi","de Kalahari","taco","zandstorm","vliegtuig"],
+  ["Cleopatra","de Nijl","dadels","zonnesteek","slang"],
+  ["Freddie Mercury","Londen","fish and chips","mist","microfoon"],
+  ["Greta Thunberg","de Noordpool","havermelk","smeltend ijs","zeilboot"],
+  ["Kim Kardashian","Los Angeles","avocadotoast","zonsondergang","selfie"],
+  ["Napoleon","Waterloo","croissant","kanonschot","steekhoed"],
+  ["David Attenborough","de Serengeti","mango","oerwoud","olifant"],
+  ["Adele","de Theems","scone","regenbui","platenspeler"],
+  ["Usain Bolt","Jamaica","jerk chicken","bliksemschicht","stopwatch"],
+  ["Frida Kahlo","Mexico-Stad","chili","vulkaanuitbarsting","papegaai"],
+  ["Michelangelo","Rome","pizza","marmer","penseel"],
+  ["Beyoncé","de Bahama's","cornflakes","orkaan","spiegelbal"],
+  ["Clouseau","Hasselt","rijstpap","onweer","kerkorgel"],
+  ["Metejoor","Plopsaland","smoutebollen","hooikoorts","reuzenrad"],
+  ["Angèle","Namen","vol-au-vent","jetlag","kabelbaan"],
+  ["Philippe Geubels","Ieper","kaaskroket","fileleed","typemachine"],
+  ["Jeroen Meus","de Efteling","hutsepot","zonsopgang","draaimolen"],
+  ["Gert Verhulst","Middelkerke","suikerspin","mistlamp","botsauto's"],
+  ["Kuifje","het Gravensteen","paling in 't groen","dooi","verrekijker"],
+  ["Suske en Wiske","Diksmuide","boterkoek","sneeuwbui","stripboek"],
+  ["K3","Walibi","chocoladebroodje","warmtegolf","achtbaan"],
+  ["Samson en Gert","het Belfort","witloof met ham","regenboog","brievenbus"],
+  ["Taylor Swift","New York","cheesecake","sneeuwstorm","microfoon"],
+  ["Cristiano Ronaldo","Lissabon","pastel de nata","aardschok","voetbalschoen"],
+  ["Vincent van Gogh","Arles","zonnebloemolie","mistral","penseel"],
+  ["Mozart","Salzburg","sachertorte","donder","piano"],
+  ["Nelson Mandela","Kaapstad","biltong","droogte","gevangeniscel"],
+  ["Marie Curie","Parijs","macaron","straling","reageerbuis"],
+  ["Steve Jobs","Silicon Valley","smoothie","zonnepaneel","smartphone"],
+  ["Charlie Chaplin","Hollywood","popcorn","stortbui","wandelstok"],
+  ["Roger Federer","Zwitserland","fondue","lawine","tennisnet"],
+  ["Elvis Presley","Las Vegas","donut","hittegolf","platenspeler"],
+  ["Remco Evenepoel","de Muur van Geraardsbergen","energiereep","tegenwind","fietshelm"],
+  ["Nina Derwael","Sint-Truiden","proteïnereep","zweet","evenwichtsbalk"],
+  ["Emma Meesseman","de sporthal","sportdrank","blessure","basketring"],
+  ["Bart Swings","de ijspiste","bananenmilkshake","vrieskou","schaatsen"],
+  ["Jacky Ickx","het circuit","pitstopkoffie","benzinedamp","stuurwiel"],
+  ["Wim Helsen","de schouwburg","spawater","plankenkoorts","spotlight"],
+  ["Alex Agnew","de comedyclub","whisky","heisa","microfoonstandaard"],
+  ["Kamal Kharmach","de collegezaal","muntthee","begroting","rekenmachine"],
+  ["Piet Huysentruyt","de keuken","crème brûlée","stoom","garde"],
+  ["Sofie Dumont","de bakkerij","frangipane","meelstof","deegroller"],
+  ["Nijntje","het konijnenhol","wortelcake","voorjaarszon","knuffel"],
+  ["De Smurfen","het paddenstoelendorp","blauwe bes","onweersbui","toverdrank"],
+  ["Asterix","een Gallisch dorp","everzwijn aan het spit","bliksem","menhir"],
+  ["Lucky Luke","het Wilde Westen","bonen uit blik","stofwolk","revolver"],
+  ["Pippi Langkous","Villa Kakelbont","pannenkoek met suiker","zeebries","paard optillen"],
+  ["James Ensor","Oostende","garnalen","zeemist","schildersezel"],
+  ["René Magritte","Brussel","appel","bewolking","bolhoed"],
+  ["Rubens","Antwerpen","ossenhaas","gouden gloed","schilderspalet"],
+  ["Pieter Bruegel","het dorpsplein","boerenbrood","winterlucht","houten wiel"],
+  ["Leonardo da Vinci","Firenze","minestrone","nevel","schetsboek"],
+  ["Michael Jackson","het podium","milkshake","vuurwerk","witte handschoen"],
+  ["Madonna","Londen","afternoon tea","stortregen","koptelefoon"],
+  ["Lady Gaga","Los Angeles","cupcake","smog","zonnebril"],
+  ["Rafael Nadal","Mallorca","paella","felle zon","poloshirt"],
+  ["Muhammad Ali","de boksring","havermout","zweetdruppel","bokshandschoen"],
+  ["Neil Armstrong","de maan","astronautenvoeding","sterrenhemel","ruimtepak"],
+  ["Nikola Tesla","het laboratorium","zwarte koffie","statische vonk","koperspoel"],
+  ["Gandhi","India","linzencurry","moesson","spinnewiel"],
+  ["Julius Caesar","het Forum Romanum","druiven","onweer boven de Alpen","lauwerkrans"],
+  ["Shakespeare","Stratford","rosbief","Engelse mist","ganzenveer"],
+  ["Rowan Atkinson","een klein autootje","kalkoen","motregen","teddybeer"],
+  ["Elon Musk","Mars","energiedrank","zonnestorm","raket"],
+  ["Barack Obama","het Witte Huis","appeltaart","orkaanwaarschuwing","spreekgestoelte"],
+  ["Zwangere Guy","Brussel","mergpijpje","stadsmist","graffitispuitbus"],
+  ["Tourist LeMC","Antwerpen","boterham met plattekaas","zeevocht","akoestische gitaar"],
+  ["Camille","Gent","matcha latte","voorjaarsregen","platenlabel"],
+  ["Bart Cannaerts","de theaterzaal","spa bruis","lampenkoorts","barkruk"],
+  ["Kim Gevaert","de atletiekpiste","isotone drank","startschot","spikes"],
+  ["Justine Henin","Luik","Luikse wafel","zonneschijn","tennisbal"],
+  ["Thibau Nys","het modderparcours","gelbidon","sneeuwslijk","crossfiets"],
+];
+
+/* ========================================================= */
+/*   Kaartjes tonen                                           */
+/* ========================================================= */
+const cardEl=document.getElementById("card"), tip=document.getElementById("tip");
+let bag=[], lastCard=-1, guessed=new Set();
+function drawIndex(){
+  if(bag.length===0){
+    bag=DECK.map((_,i)=>i);
+    for(let i=bag.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[bag[i],bag[j]]=[bag[j],bag[i]];}
+    if(bag[0]===lastCard && bag.length>1){[bag[0],bag[1]]=[bag[1],bag[0]];}
+  }
+  const idx=bag.pop(); lastCard=idx; return idx;
+}
+function renderCard(){
+  guessed.clear();
+  const words=DECK[drawIndex()];
+  cardEl.innerHTML=words.map((w,i)=>
+    `<button class="row" data-i="${i}" aria-pressed="false"><span class="num">${i+1}</span><span class="word">${w}</span><span class="check">✓</span></button>`
+  ).join("");
+}
+cardEl.addEventListener("click", e=>{
+  const row=e.target.closest(".row"); if(!row) return;
+  const i=+row.dataset.i;
+  if(guessed.has(i)){ guessed.delete(i); row.classList.remove("done"); row.setAttribute("aria-pressed","false"); }
+  else { guessed.add(i); row.classList.add("done"); row.setAttribute("aria-pressed","true"); beep(660,.05,.18); }
+  tip.style.opacity=0;
+  updateScoreboard();
+});
+
+/* ========================================================= */
+/*   Schermbeheer                                             */
+/* ========================================================= */
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("active", s.id===id));
+}
+
+/* ========================================================= */
+/*   Startscherm                                             */
+/* ========================================================= */
+let selMode=1, selRounds=5;
+const modeSeg=document.getElementById("modeSeg"), roundSeg=document.getElementById("roundSeg");
+const team1label=document.getElementById("team1label"), team2wrap=document.getElementById("team2wrap");
+
+modeSeg.addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  selMode=+b.dataset.mode;
+  [...modeSeg.children].forEach(c=>c.classList.toggle("selected", c===b));
+  team2wrap.style.display = selMode===2 ? "flex" : "none";
+  team1label.textContent = selMode===2 ? "Team 1" : "Teamnaam";
+});
+roundSeg.addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  selRounds=+b.dataset.rounds;
+  [...roundSeg.children].forEach(c=>c.classList.toggle("selected", c===b));
+});
+document.getElementById("startBtn").addEventListener("click", startGame);
+document.getElementById("toBoard").addEventListener("click", ()=>{ renderBoard(); showScreen("screen-board"); });
+
+/* ========================================================= */
+/*   Spelstatus                                              */
+/* ========================================================= */
+const ACCENTS=["var(--vermilion)","var(--teal)"];
+let cfg={numTeams:1,rounds:5};
+let teams=[];      // {name, score, played}
+let active=0, turnsTotal=0;
+
+function startGame(){
+  cfg.numTeams=selMode; cfg.rounds=selRounds;
+  const n1=(document.getElementById("team1").value.trim())||(selMode===2?"Team 1":"Ons team");
+  const n2=(document.getElementById("team2").value.trim())||"Team 2";
+  teams = selMode===2 ? [{name:n1,score:0,played:0},{name:n2,score:0,played:0}]
+                      : [{name:n1,score:0,played:0}];
+  active=0; turnsTotal=0;
+  renderCard(); reset(); buildScoreboard(); updateGameUI();
+  tip.style.opacity=1;
+  showScreen("screen-game");
+}
+
+function buildScoreboard(){
+  const sb=document.getElementById("scoreboard");
+  sb.innerHTML=teams.map((t,i)=>
+    `<div class="team" id="tm${i}" style="--acc:${ACCENTS[i]}">
+       <div class="team-name"><span class="dot" style="background:${ACCENTS[i]}"></span><span>${escapeHtml(t.name)}</span></div>
+       <div class="team-score" id="tmScore${i}">0</div>
+       <div class="team-sub" id="tmSub${i}"></div>
+     </div>`).join("");
+}
+function updateScoreboard(){
+  teams.forEach((t,i)=>{
+    const live=t.score + (i===active ? guessed.size : 0);
+    document.getElementById("tmScore"+i).textContent=live;
+    document.getElementById("tmSub"+i).textContent = (i===active && guessed.size>0) ? "+"+guessed.size+" deze beurt" : "";
+    document.getElementById("tm"+i).classList.toggle("active", i===active);
+  });
+}
+function updateGameUI(){
+  const t=teams[active];
+  const round=Math.min(t.played+1, cfg.rounds);
+  const status=document.getElementById("status");
+  status.innerHTML = cfg.numTeams===2
+    ? `Aan zet: <b>${escapeHtml(t.name)}</b> &middot; ronde ${round}/${cfg.rounds}`
+    : `Ronde ${round}/${cfg.rounds}`;
+  const last = (turnsTotal+1) >= cfg.numTeams*cfg.rounds;
+  document.getElementById("next").innerHTML = last ? "Toon uitslag &rsaquo;" : "Volgende beurt &rsaquo;";
+  updateScoreboard();
+}
+
+function nextTurn(){
+  teams[active].score += guessed.size;
+  teams[active].played += 1;
+  turnsTotal += 1;
+  if(turnsTotal >= cfg.numTeams*cfg.rounds){ endGame(); return; }
+  active = turnsTotal % cfg.numTeams;
+  renderCard(); reset(); tip.style.opacity=1; updateGameUI();
+}
+
+/* ========================================================= */
+/*   Uitslag + leaderbord vullen                             */
+/* ========================================================= */
+function endGame(){
+  // records opslaan
+  const now=Date.now();
+  const freshIds=[];
+  teams.forEach(t=>{
+    const id="e"+now+"_"+Math.random().toString(36).slice(2,7);
+    leaderboard.push({id, name:t.name, score:t.score, rounds:cfg.rounds, teams:cfg.numTeams, ts:now});
+    freshIds.push(id);
+  });
+  leaderboard.sort((a,b)=> b.score-a.score || a.ts-b.ts);
+  if(leaderboard.length>20) leaderboard=leaderboard.slice(0,20);
+  persist();
+
+  // uitslag tonen
+  const title=document.getElementById("resultTitle");
+  const finals=document.getElementById("finals");
+  const ranked=[...teams].sort((a,b)=>b.score-a.score);
+  let winnerNames=[];
+  if(cfg.numTeams===2){
+    if(teams[0].score===teams[1].score){ title.textContent="Gelijkspel!"; }
+    else { winnerNames=[ranked[0].name]; title.textContent=ranked[0].name+" wint!"; }
+  } else {
+    title.textContent = teams[0].score+" punten";
+  }
+  finals.innerHTML=ranked.map(t=>{
+    const win = winnerNames.includes(t.name);
+    const idx = teams.indexOf(t);
+    const madeBoard = leaderboard.some(e=>freshIds.includes(e.id) && e.name===t.name && e.score===t.score);
+    return `<div class="final ${win?'win':''}">
+      <span class="dot" style="background:${ACCENTS[idx]}"></span>
+      <span class="fname">${escapeHtml(t.name)}</span>
+      ${win?'<span class="crown">👑</span>':''}
+      ${madeBoard?'<span class="newflag">op leaderbord</span>':''}
+      <span class="fscore">${t.score}</span>
+    </div>`;
+  }).join("");
+
+  lastFreshIds=freshIds;
+  showScreen("screen-over");
+  buzzerCelebrate();
+}
+
+document.getElementById("playAgain").addEventListener("click", ()=>{
+  teams.forEach(t=>{t.score=0;t.played=0;});
+  active=0; turnsTotal=0;
+  renderCard(); reset(); buildScoreboard(); updateGameUI(); tip.style.opacity=1;
+  showScreen("screen-game");
+});
+document.getElementById("overToStart").addEventListener("click", ()=>showScreen("screen-start"));
+document.getElementById("overToBoard").addEventListener("click", ()=>{ renderBoard(); showScreen("screen-board"); });
+
+/* ========================================================= */
+/*   Leaderbord (lokaal opgeslagen)                          */
+/* ========================================================= */
+const LB_KEY="ts30_leaderboard_v1";
+let leaderboard=[]; let lastFreshIds=[];
+try{ leaderboard = JSON.parse(localStorage.getItem(LB_KEY)) || []; }catch(e){ leaderboard=[]; }
+function persist(){ try{ localStorage.setItem(LB_KEY, JSON.stringify(leaderboard)); }catch(e){} }
+
+function renderBoard(){
+  const lb=document.getElementById("lb");
+  if(leaderboard.length===0){
+    lb.innerHTML='<div class="lb-empty">Nog geen scores. Speel een spel om het leaderbord te vullen.</div>';
+    return;
+  }
+  const medal=["🥇","🥈","🥉"];
+  lb.innerHTML=leaderboard.map((e,i)=>{
+    const rank = i<3 ? medal[i] : (i+1);
+    const d = new Date(e.ts).toLocaleDateString("nl-BE",{day:"numeric",month:"short"});
+    const meta = `${e.rounds} beurten &middot; ${e.teams===2?'2 teams':'samenspel'} &middot; ${d}`;
+    const fresh = lastFreshIds.includes(e.id) ? "fresh" : "";
+    return `<div class="lb-row ${fresh}">
+      <div class="lb-rank">${rank}</div>
+      <div class="lb-main"><div class="lb-name">${escapeHtml(e.name)}</div><div class="lb-meta">${meta}</div></div>
+      <div class="lb-score">${e.score}</div>
+    </div>`;
+  }).join("");
+}
+document.getElementById("boardBack").addEventListener("click", ()=>{
+  lastFreshIds=[];
+  showScreen(document.getElementById("screen-over").dataset.wasActive==="1" ? "screen-over" : "screen-start");
+});
+document.getElementById("clearBoard").addEventListener("click", ()=>{
+  if(confirm("Alle topscores wissen?")){ leaderboard=[]; lastFreshIds=[]; persist(); renderBoard(); }
+});
+
+/* ========================================================= */
+/*   Timer                                                   */
+/* ========================================================= */
+const DURATION=30000;
+const prog=document.getElementById("prog"), secsEl=document.getElementById("secs");
+const stateEl=document.getElementById("state"), gameScreen=document.getElementById("screen-game"), hint=document.getElementById("hint");
+const C=2*Math.PI*52; prog.style.strokeDasharray=C;
+let remaining=DURATION, running=false, raf=null, last=0, shownSec=30;
+function paint(){
+  const frac=Math.max(0,remaining/DURATION);
+  prog.style.strokeDashoffset=C*(1-frac);
+  prog.style.stroke=`hsl(${8+frac*150} 78% 55%)`;
+  const sec=Math.ceil(remaining/1000);
+  if(sec!==shownSec){ if(running && sec>0 && sec<=5) beep(880,.05,.25); shownSec=sec; }
+  secsEl.textContent=sec;
+  gameScreen.classList.toggle("urgent", running && sec<=5 && sec>0);
+}
+function loop(ts){
+  if(!last) last=ts;
+  remaining-=(ts-last); last=ts;
+  if(remaining<=0){ remaining=0; paint(); finish(); return; }
+  paint(); raf=requestAnimationFrame(loop);
+}
+function start(){ if(remaining<=0) reset(true); running=true; last=0; stateEl.textContent="bezig"; gameScreen.classList.remove("done"); hint.style.opacity=0; raf=requestAnimationFrame(loop); }
+function pause(){ running=false; cancelAnimationFrame(raf); stateEl.textContent="pauze"; gameScreen.classList.remove("urgent"); }
+function toggle(){ ensureAudio(); running?pause():start(); }
+function reset(silent){ running=false; cancelAnimationFrame(raf); remaining=DURATION; shownSec=30; gameScreen.classList.remove("urgent","done"); stateEl.textContent="klaar"; paint(); if(!silent) hint.style.opacity=1; }
+function finish(){ running=false; stateEl.textContent="tijd om!"; gameScreen.classList.add("done"); gameScreen.classList.remove("urgent"); setTimeout(()=>gameScreen.classList.remove("done"),500); buzzer(); }
+
+/* ========================================================= */
+/*   Geluid                                                  */
+/* ========================================================= */
+let actx=null, muted=false;
+function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(actx && actx.state==="suspended") actx.resume(); }
+function beep(freq,dur,vol){ if(muted||!actx) return; const o=actx.createOscillator(),g=actx.createGain(); o.type="sine"; o.frequency.value=freq; g.gain.setValueAtTime(0,actx.currentTime); g.gain.linearRampToValueAtTime(vol,actx.currentTime+.01); g.gain.exponentialRampToValueAtTime(.0001,actx.currentTime+dur); o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime+dur); }
+function buzzer(){ if(muted||!actx) return; [0,.18,.36].forEach(t=>setTimeout(()=>beep(196,.28,.3),t*1000)); }
+function buzzerCelebrate(){ if(muted||!actx) return; [523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,.18,.25), i*90)); }
+
+/* ========================================================= */
+/*   Bediening                                               */
+/* ========================================================= */
+document.getElementById("timerBtn").addEventListener("click", toggle);
+document.getElementById("reset").addEventListener("click", ()=>reset());
+document.getElementById("mute").addEventListener("click", e=>{ muted=!muted; e.currentTarget.textContent=muted?"✕":"♪"; e.currentTarget.style.opacity=muted?.5:1; if(!muted) ensureAudio(); });
+document.getElementById("next").addEventListener("click", nextTurn);
+document.getElementById("homeBtn").addEventListener("click", ()=>{ pause(); showScreen("screen-start"); });
+
+document.addEventListener("keydown", e=>{
+  if(!gameScreen.classList.contains("active")) return;
+  const onButton = document.activeElement && document.activeElement.tagName==="BUTTON";
+  if(e.code==="Space"){ if(onButton) return; e.preventDefault(); toggle(); }
+  else if(e.key==="n"||e.key==="N"){ nextTurn(); }
+  else if(e.key==="r"||e.key==="R"){ reset(); }
+});
+
+/* mark of het uitslagscherm actief was, voor de terugknop van het bord */
+document.getElementById("overToBoard").addEventListener("click", ()=>document.getElementById("screen-over").dataset.wasActive="1");
+document.getElementById("toBoard").addEventListener("click", ()=>document.getElementById("screen-over").dataset.wasActive="0");
+
+/* ========================================================= */
+/*   Hulp                                                    */
+/* ========================================================= */
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+
+/* ---------- Service worker (offline / installeerbaar) ---------- */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+
+/* start klaarzetten */
+renderCard(); paint();
+</script>
+</body>
+</html>
