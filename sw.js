@@ -1,5 +1,5 @@
 /* 30 Seconden - service worker voor offline gebruik */
-const CACHE = "ts30-v1";
+const CACHE = "ts30-v2";
 const ASSETS = [
   "./",
   "./index.html",
